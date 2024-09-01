@@ -1,127 +1,149 @@
-// Package: main
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
-	"strings"
+	"path/filepath"
 
-	_ "github.com/go-sql-driver/mysql"
+	"cmsum/joomla"
+	"cmsum/wordpress"
+
+	cli "github.com/jawher/mow.cli"
 )
 
-// DBConfig holds the database configuration details
-type DBConfig struct {
-	Host     string
-	Port     int
-	User     string
-	Password string
-	DBName   string
-}
-
-// UserDetail holds the details of a user including their roles
-type UserDetail struct {
-	ID       int
-	Username string
-	Name     string
-	Email    string
-	Roles    []string
-}
-
-// connectDB initializes a connection to the database using the provided DBConfig
-func connectDB(config DBConfig) (*sql.DB, error) {
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4,utf8&parseTime=True",
-		config.User, config.Password, config.Host, config.Port, config.DBName)
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, err
-	}
-	err = db.Ping()
-	if err != nil {
-		return nil, err
-	}
-	return db, nil
-}
+var cmsPath string
 
 func main() {
+	app := cli.App("cmsum", "Content Management System User Management")
 
-	filePath := "wp-config.php"
-	_, err := os.Stat(filePath)
+	app.StringOpt("p path", "", "Path to the CMS root directory")
 
-	if err == nil {
-		dbName, dbUser, dbPassword, err := extractWPDBDetails(filePath)
-		if err != nil {
-			fmt.Println("Error reading file:", err)
-		}
-
-		fmt.Println("DB Name:", dbName)
-		fmt.Println("DB User:", dbUser)
-
-		// Example usage
-		config := DBConfig{
-			Host:     "localhost",
-			Port:     3306,
-			User:     dbUser,
-			Password: dbPassword,
-			DBName:   dbName,
-		}
-
-		prefixesWP, err := identifyWPPrefixes(config)
-		if err != nil {
-			log.Fatal(err)
-		}
-		fmt.Println("Identified WordPress table prefixes:", strings.Join(prefixesWP, ", "))
-
-		for _, prefix := range prefixesWP {
-			listWordPressUsers(config, prefix)
+	app.Before = func() {
+		cmsPath = *app.StringOpt("p path", "", "Path to the CMS root directory")
+		if cmsPath != "" {
+			if _, err := os.Stat(cmsPath); os.IsNotExist(err) {
+				log.Fatalf("The specified CMS path does not exist: %s", cmsPath)
+			}
 		}
 	}
 
-	filePath = "configuration.php"
-	_, err = os.Stat(filePath)
+	app.Command("users", "User management commands", func(users *cli.Cmd) {
+		users.Command("list", "List users", listUsers)
+		users.Command("info", "Show user info", userInfo)
+		users.Command("edit", "Edit user details", editUser)
+	})
 
-	if err == nil {
-		dbName, dbUser, dbPassword, _, err := extractJoomlaDBConfig(filePath)
+	app.Command("info", "Show CMS information", func(info *cli.Cmd) {
+		info.Command("general", "Show general CMS information", showInfo)
+		info.Command("version", "Show CMS version information", showVersion)
+	})
+
+	if err := app.Run(os.Args); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func detectCMS() string {
+	wpConfig := filepath.Join(cmsPath, "wp-config.php")
+	joomlaConfig := filepath.Join(cmsPath, "configuration.php")
+
+	if _, err := os.Stat(wpConfig); err == nil {
+		return "wordpress"
+	}
+	if _, err := os.Stat(joomlaConfig); err == nil {
+		return "joomla"
+	}
+	return ""
+}
+
+func listUsers(cmd *cli.Cmd) {
+	cmd.Action = func() {
+		cmsType := detectCMS()
+		if cmsType == "" {
+			log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
+		}
+
+		var err error
+		if cmsType == "wordpress" {
+			err = wordpress.ProcessWordPress(cmsPath)
+		} else if cmsType == "joomla" {
+			err = joomla.ProcessJoomla(cmsPath)
+		}
+
 		if err != nil {
-			fmt.Println("Error reading file:", err)
+			log.Printf("Error processing %s: %v", cmsType, err)
+		}
+	}
+}
+
+func editUser(cmd *cli.Cmd) {
+	var username = cmd.StringArg("USERNAME", "", "Username of the user to edit")
+
+	cmd.Action = func() {
+		cmsType := detectCMS()
+		if cmsType == "" {
+			log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
 		}
 
-		// Example usage
-		config := DBConfig{
-			Host:     "localhost",
-			Port:     3306,
-			User:     dbUser,
-			Password: dbPassword,
-			DBName:   dbName,
+		var err error
+		if cmsType == "wordpress" {
+			err = wordpress.EditUser(cmsPath, *username)
+		} else if cmsType == "joomla" {
+			err = joomla.EditUser(cmsPath, *username)
 		}
 
-		fmt.Println("DB Name:", dbName)
-		fmt.Println("DB User:", dbUser)
-		fmt.Println()
-
-		db, err := connectDB(config)
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Error editing %s user: %v", cmsType, err)
 		}
-		defer db.Close()
+	}
+}
 
-		prefixesJoomla, err := identifyJoomlaPrefixes(config)
+func showInfo(cmd *cli.Cmd) {
+	cmd.Action = func() {
+		cmsType := detectCMS()
+		if cmsType == "" {
+			log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
+		}
+
+		var err error
+		if cmsType == "wordpress" {
+			err = wordpress.ShowInfo(cmsPath)
+		} else if cmsType == "joomla" {
+			err = joomla.ShowInfo(cmsPath)
+		}
+
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Error showing %s info: %v", cmsType, err)
 		}
-		fmt.Println("Identified Joomla table prefixes:", strings.Join(prefixesJoomla, ", "))
-		fmt.Println()
+	}
+}
 
-		users, err := listJoomlaUsersAcrossPrefixes(db, config)
+func showVersion(cmd *cli.Cmd) {
+	cmd.Action = func() {
+		cmsType := detectCMS()
+		if cmsType == "" {
+			log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
+		}
+
+		var version string
+		var err error
+		if cmsType == "wordpress" {
+			version, err = wordpress.GetVersion(cmsPath)
+		} else if cmsType == "joomla" {
+			version, err = joomla.GetVersion(cmsPath)
+		}
+
 		if err != nil {
-			log.Fatal(err)
+			log.Printf("Error showing %s version: %v", cmsType, err)
+		} else {
+			fmt.Printf("%s Version: %s\n", cmsType, version)
 		}
+	}
+}
 
-		fmt.Println("Identified Joomla users:")
-		for _, user := range users {
-			// Assuming you want to print the ID, Name, Email, and Roles for each user
-			fmt.Printf("ID: %d, Username: %s, Roles: %s, Name: %s, Email: %s\n", user.ID, user.Username, strings.Join(user.Roles, ", "), user.Name, user.Email)
-		}
+func userInfo(cmd *cli.Cmd) {
+	cmd.Action = func() {
+		fmt.Println("User info functionality not implemented yet.")
 	}
 }
