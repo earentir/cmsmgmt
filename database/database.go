@@ -8,6 +8,7 @@ import (
 	_ "github.com/lib/pq"
 )
 
+// DBConfig holds the configuration for connecting to a database.
 type DBConfig struct {
 	Type     string // "mysql" or "postgres"
 	Host     string
@@ -17,6 +18,7 @@ type DBConfig struct {
 	DBName   string
 }
 
+// Connect establishes a connection to the database using the provided configuration.
 func Connect(config DBConfig) (*sql.DB, error) {
 	var dsn string
 	var driverName string
@@ -47,10 +49,11 @@ func Connect(config DBConfig) (*sql.DB, error) {
 	return db, nil
 }
 
+// IdentifyPrefixes identifies the prefixes used in the database tables for WordPress and Joomla.
 func IdentifyPrefixes(db *sql.DB, dbType string) ([]string, error) {
 	var query string
 	switch dbType {
-	case "mysql":
+	case "mysql", "mysqli":
 		query = "SHOW TABLES"
 	case "postgres":
 		query = "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema'"
