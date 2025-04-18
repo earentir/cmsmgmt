@@ -22,7 +22,7 @@ func Connect(config DBConfig) (*sql.DB, error) {
 	var driverName string
 
 	switch config.Type {
-	case "mysql":
+	case "mysql", "mysqli":
 		dsn = fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True",
 			config.User, config.Password, config.Host, config.Port, config.DBName)
 		driverName = "mysql"

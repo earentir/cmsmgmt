@@ -18,11 +18,10 @@ func main() {
 	app := cli.App("cmsum", "Content Management System User Management")
 
 	app.StringOpt("p path", "", "Path to the CMS root directory")
-	app.Version("v version", "cmsum 0.0.7")
+	app.Version("v version", "cmsum 0.0.9")
 	app.LongDesc = "https://github.com/earentir/cmsum"
 
 	app.Before = func() {
-		cmsPath = *app.StringOpt("p path", "", "Path to the CMS root directory")
 		if cmsPath != "" {
 			if _, err := os.Stat(cmsPath); os.IsNotExist(err) {
 				log.Fatalf("The specified CMS path does not exist: %s", cmsPath)
