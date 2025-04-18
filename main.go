@@ -69,7 +69,21 @@ func listUsers(cmd *cli.Cmd) {
 		if cmsType == "wordpress" {
 			err = wordpress.ProcessWordPress(cmsPath)
 		} else if cmsType == "joomla" {
-			err = joomla.ProcessJoomla(cmsPath)
+			db, cfg, defaultPrefix, err := joomla.ProcessJoomla(cmsPath)
+			if err == nil {
+				fmt.Printf("Joomla DB Name: %s\n", cfg.DBName)
+				fmt.Printf("Joomla DB User: %s\n", cfg.User)
+				fmt.Printf("Identified Joomla table prefixes: %v\n", defaultPrefix)
+
+				users, err := joomla.ListUsers(db, defaultPrefix)
+				if err != nil {
+					fmt.Println(fmt.Errorf("list users for prefix %s: %w", defaultPrefix, err))
+				}
+				fmt.Printf("\nUsers for prefix '%s':\n", defaultPrefix)
+				for _, u := range users {
+					fmt.Printf("ID:%d  Username:%s  Name:%s  Email:%s  Roles:%v\n", u.ID, u.Username, u.Name, u.Email, u.Roles)
+				}
+			}
 		}
 
 		if err != nil {
@@ -91,7 +105,10 @@ func editUser(cmd *cli.Cmd) {
 		if cmsType == "wordpress" {
 			err = wordpress.EditUser(cmsPath, *username)
 		} else if cmsType == "joomla" {
-			err = joomla.EditUser(cmsPath, *username)
+			db, _, defaultPrefix, err := joomla.ProcessJoomla(cmsPath)
+			if err == nil {
+				err = joomla.EditUser(db, defaultPrefix, cmsPath, *username)
+			}
 		}
 
 		if err != nil {
@@ -127,18 +144,21 @@ func showVersion(cmd *cli.Cmd) {
 			log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
 		}
 
-		var version string
+		var version, rel string
 		var err error
 		if cmsType == "wordpress" {
 			version, err = wordpress.GetVersion(cmsPath)
 		} else if cmsType == "joomla" {
-			version, err = joomla.GetVersion(cmsPath)
+			version, rel, err = joomla.GetVersion(cmsPath)
 		}
 
 		if err != nil {
 			log.Printf("Error showing %s version: %v", cmsType, err)
 		} else {
 			fmt.Printf("%s Version: %s\n", cmsType, version)
+			if cmsType == "joomla" {
+				fmt.Printf("Release: %s\n", rel)
+			}
 		}
 	}
 }
