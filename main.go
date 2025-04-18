@@ -18,7 +18,7 @@ func main() {
 	app := cli.App("cmsum", "Content Management System User Management")
 
 	app.StringOpt("p path", "", "Path to the CMS root directory")
-	app.Version("v version", "cmsum 0.0.11")
+	app.Version("v version", "cmsum 0.0.13")
 	app.LongDesc = "https://github.com/earentir/cmsum"
 
 	app.Before = func() {

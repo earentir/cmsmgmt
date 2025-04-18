@@ -3,6 +3,8 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"sort"
+	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
@@ -52,11 +54,14 @@ func Connect(config DBConfig) (*sql.DB, error) {
 // IdentifyPrefixes identifies the prefixes used in the database tables for WordPress and Joomla.
 func IdentifyPrefixes(db *sql.DB, dbType string) ([]string, error) {
 	var query string
-	switch dbType {
+	switch strings.ToLower(dbType) {
 	case "mysql", "mysqli":
 		query = "SHOW TABLES"
 	case "postgres":
-		query = "SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname != 'pg_catalog' AND schemaname != 'information_schema'"
+		query = `
+            SELECT tablename
+            FROM   pg_catalog.pg_tables
+            WHERE  schemaname NOT IN ('pg_catalog', 'information_schema')`
 	default:
 		return nil, fmt.Errorf("unsupported database type: %s", dbType)
 	}
@@ -67,22 +72,70 @@ func IdentifyPrefixes(db *sql.DB, dbType string) ([]string, error) {
 	}
 	defer rows.Close()
 
-	prefixSet := make(map[string]bool)
+	// track which companion tables we have seen for each prefix
+	type flags struct {
+		users, posts, userMap, userGroups bool
+	}
+	seen := make(map[string]*flags)
+
 	for rows.Next() {
-		var table string
-		if err := rows.Scan(&table); err != nil {
+		var tbl string
+		if err := rows.Scan(&tbl); err != nil {
 			return nil, fmt.Errorf("failed to scan row: %v", err)
 		}
-		// This logic might need to be adjusted based on the specific naming conventions of WordPress and Joomla
-		if len(table) > 6 && (table[len(table)-6:] == "_users" || table[len(table)-6:] == "_posts") {
-			prefix := table[:len(table)-6]
-			prefixSet[prefix] = true
+
+		switch {
+		case strings.HasSuffix(tbl, "_users"):
+			p := strings.TrimSuffix(tbl, "_users")
+			f := seen[p]
+			if f == nil {
+				f = &flags{}
+				seen[p] = f
+			}
+			f.users = true
+
+		case strings.HasSuffix(tbl, "_posts"):
+			p := strings.TrimSuffix(tbl, "_posts")
+			f := seen[p]
+			if f == nil {
+				f = &flags{}
+				seen[p] = f
+			}
+			f.posts = true
+
+		case strings.HasSuffix(tbl, "_user_usergroup_map"):
+			p := strings.TrimSuffix(tbl, "_user_usergroup_map")
+			f := seen[p]
+			if f == nil {
+				f = &flags{}
+				seen[p] = f
+			}
+			f.userMap = true
+
+		case strings.HasSuffix(tbl, "_usergroups"):
+			p := strings.TrimSuffix(tbl, "_usergroups")
+			f := seen[p]
+			if f == nil {
+				f = &flags{}
+				seen[p] = f
+			}
+			f.userGroups = true
 		}
 	}
 
 	var prefixes []string
-	for prefix := range prefixSet {
-		prefixes = append(prefixes, prefix)
+	for p, f := range seen {
+		if !f.users {
+			continue // never keep a prefix without _users
+		}
+
+		// WordPress – users + posts
+		// Joomla    – users + (userMap or userGroups)
+		if f.posts || (f.userMap && f.userGroups) || (f.userMap || f.userGroups && f.posts) {
+			prefixes = append(prefixes, p)
+		}
 	}
+
+	sort.Strings(prefixes) // deterministic order (optional)
 	return prefixes, nil
 }

@@ -115,22 +115,44 @@ func ListUsersAcrossPrefixes(db *sql.DB, prefixes []string) ([]UserDetail, error
 	return allUsers, nil
 }
 
-// GetVersion retrieves the Joomla version from the Version.php file.
+// GetVersion returns the full Joomla version, e.g. "3.10.6 (Stable)" or "4.4.2 (Stable)".
 func GetVersion(cmsPath string) (string, error) {
 	versionFile := filepath.Join(cmsPath, "libraries", "src", "Version.php")
-	content, err := os.ReadFile(versionFile)
+	contentBytes, err := os.ReadFile(versionFile)
 	if err != nil {
-		return "", fmt.Errorf("failed to read Joomla version file: %v", err)
+		return "", fmt.Errorf("failed to read Joomla version file: %w", err)
+	}
+	content := string(contentBytes)
+
+	// helper to cut repetition
+	get := func(re *regexp.Regexp) string {
+		if m := re.FindStringSubmatch(content); len(m) == 2 {
+			return m[1]
+		}
+		return ""
 	}
 
-	re := regexp.MustCompile(`const RELEASE\s*=\s*'(.+)';`)
-	matches := re.FindStringSubmatch(string(content))
+	reRelease := regexp.MustCompile(`(?m)const\s+RELEASE\s*=\s*'([^']+)';`)
+	rePatch := regexp.MustCompile(`(?m)const\s+DEV_LEVEL\s*=\s*'([^']+)';`)
+	// Accept either DEV_STATUS (J 3) or RELTYPE (J 4)
+	reStatus := regexp.MustCompile(`(?m)const\s+(?:DEV_STATUS|RELTYPE)\s*=\s*'([^']+)';`)
 
-	if len(matches) < 2 {
-		return "", fmt.Errorf("could not find Joomla version in Version.php")
+	release := get(reRelease)
+	if release == "" {
+		return "", fmt.Errorf("RELEASE not found in Version.php")
 	}
 
-	return matches[1], nil
+	patch := get(rePatch)   // empty if the constant is missing
+	status := get(reStatus) // empty if neither constant present
+
+	version := release
+	if patch != "" {
+		version += "." + patch
+	}
+	if status != "" {
+		version += " (" + status + ")"
+	}
+	return version, nil
 }
 
 // GetUserByUsername retrieves a user by their username.
