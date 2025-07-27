@@ -8,7 +8,7 @@ Content Management System Management (cmsmgmt) is a command-line tool written in
 - **Database configuration parsing** – Reads your CMS configuration to determine connection details for MySQL/PostgreSQL (Joomla) or MySQL (WordPress), including host, port, username, password and database name.
 - **List users** – Enumerates all user accounts in your CMS. For WordPress it reports the username, e-mail, role and other metadata; for Joomla it shows ID, username, name, email and roles.
 - **Edit users** – Allows you to update user information (name and e-mail) for both WordPress and Joomla. Run `cmsmgmt users edit <username>` and follow the prompts.
-- **CMS information** – Displays general information about the CMS and version number. The `info general` command prints the database name, database user and detected table prefixes. `info version` prints the WordPress or Joomla version (and release for Joomla).
+- **CMS information** – Displays general information about the CMS and version number. The `info db` command prints the database name, database user and detected table prefixes. `info version` prints the WordPress or Joomla version (and release for Joomla).
 - **Cross-database support** – Joomla installations can be backed by MySQL or PostgreSQL. WordPress support currently assumes MySQL.
 
 ## Installation
@@ -52,8 +52,8 @@ cmsmgmt --path /var/www/html users list
 ### Show CMS information
 
 ```bash
-# Display general information such as DB name, DB user and table prefixes
-cmsmgmt info general
+# Display DB information such as DB name, DB user and table prefixes
+cmsmgmt info db
 
 # Show CMS version (and release for Joomla)
 cmsmgmt info version

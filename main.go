@@ -128,9 +128,9 @@ func main() {
 		Short: "Show CMS information",
 	}
 
-	generalCmd := &cobra.Command{
-		Use:   "general",
-		Short: "Show general CMS information",
+	dbCmd := &cobra.Command{
+		Use:   "db",
+		Short: "Show db information",
 		Run: func(_ *cobra.Command, _ []string) {
 			cmsType := detectCMS()
 			if cmsType == "" {
@@ -180,7 +180,7 @@ func main() {
 		},
 	}
 
-	infoCmd.AddCommand(generalCmd)
+	infoCmd.AddCommand(dbCmd)
 	infoCmd.AddCommand(versionCmd)
 
 	rootCmd.AddCommand(usersCmd)
