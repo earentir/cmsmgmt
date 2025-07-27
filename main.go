@@ -66,9 +66,10 @@ func listUsers(cmd *cli.Cmd) {
 		}
 
 		var err error
-		if cmsType == "wordpress" {
+		switch cmsType {
+		case "wordpress":
 			err = wordpress.ProcessWordPress(cmsPath)
-		} else if cmsType == "joomla" {
+		case "joomla":
 			db, cfg, defaultPrefix, err := joomla.ProcessJoomla(cmsPath)
 			if err == nil {
 				fmt.Printf("Joomla DB Name: %s\n", cfg.DBName)
@@ -102,9 +103,10 @@ func editUser(cmd *cli.Cmd) {
 		}
 
 		var err error
-		if cmsType == "wordpress" {
+		switch cmsType {
+		case "wordpress":
 			err = wordpress.EditUser(cmsPath, *username)
-		} else if cmsType == "joomla" {
+		case "joomla":
 			db, _, defaultPrefix, err := joomla.ProcessJoomla(cmsPath)
 			if err == nil {
 				err = joomla.EditUser(db, defaultPrefix, cmsPath, *username)
@@ -125,9 +127,10 @@ func showInfo(cmd *cli.Cmd) {
 		}
 
 		var err error
-		if cmsType == "wordpress" {
+		switch cmsType {
+		case "wordpress":
 			err = wordpress.ShowInfo(cmsPath)
-		} else if cmsType == "joomla" {
+		case "joomla":
 			err = joomla.ShowInfo(cmsPath)
 		}
 
@@ -146,9 +149,10 @@ func showVersion(cmd *cli.Cmd) {
 
 		var version, rel string
 		var err error
-		if cmsType == "wordpress" {
+		switch cmsType {
+		case "wordpress":
 			version, err = wordpress.GetVersion(cmsPath)
-		} else if cmsType == "joomla" {
+		case "joomla":
 			version, rel, err = joomla.GetVersion(cmsPath)
 		}
 
