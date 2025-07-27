@@ -1,6 +1,6 @@
 # cmsum
-CMS User Management
-A tool to do a query and return the users for the CMS in the current path
+CMS Management
+A tool to manage CMS in the current path
 Supports:
 - Wordpress
 - Joomla
@@ -8,7 +8,13 @@ Supports:
 
 ## Features
 
-- List Users & Roles
+- User Managemt
+    - List Users/Roles
+    - Edit User
+- CMS Information
+    - Detect CMS Type
+    - General Information
+    - Version Information
 
 ## Usage/Examples
 
