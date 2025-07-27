@@ -6,41 +6,181 @@ import (
 	"os"
 	"path/filepath"
 
-	"cmsum/joomla"
-	"cmsum/wordpress"
+	"cmsmgmt/joomla"
+	"cmsmgmt/wordpress"
 
-	cli "github.com/jawher/mow.cli"
+	"github.com/spf13/cobra"
 )
 
-var cmsPath string
+var (
+	cmsPath    string
+	appVersion = "0.1.21"
+)
 
 func main() {
-	app := cli.App("cmsum", "Content Management System User Management")
+	rootCmd := &cobra.Command{
+		Use:     "cmsum",
+		Short:   "Content Management System User Management",
+		Long:    "https://github.com/earentir/cmsum",
+		Version: appVersion,
 
-	app.StringOpt("p path", "", "Path to the CMS root directory")
-	app.Version("v version", "cmsum 0.0.13")
-	app.LongDesc = "https://github.com/earentir/cmsum"
-
-	app.Before = func() {
-		if cmsPath != "" {
-			if _, err := os.Stat(cmsPath); os.IsNotExist(err) {
-				log.Fatalf("The specified CMS path does not exist: %s", cmsPath)
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			if cmsPath != "" {
+				if _, err := os.Stat(cmsPath); os.IsNotExist(err) {
+					return fmt.Errorf("The specified CMS path does not exist: %s", cmsPath)
+				}
 			}
-		}
+			return nil
+		},
 	}
 
-	app.Command("users", "User management commands", func(users *cli.Cmd) {
-		users.Command("list", "List users", listUsers)
-		users.Command("info", "Show user info", userInfo)
-		users.Command("edit", "Edit user details", editUser)
-	})
+	rootCmd.PersistentFlags().StringVarP(&cmsPath, "path", "p", "", "Path to the CMS root directory")
 
-	app.Command("info", "Show CMS information", func(info *cli.Cmd) {
-		info.Command("general", "Show general CMS information", showInfo)
-		info.Command("version", "Show CMS version information", showVersion)
-	})
+	usersCmd := &cobra.Command{
+		Use:   "users",
+		Short: "User management commands",
+	}
 
-	if err := app.Run(os.Args); err != nil {
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List users",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmsType := detectCMS()
+			if cmsType == "" {
+				log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
+			}
+
+			var err error
+			if cmsType == "wordpress" {
+				err = wordpress.ProcessWordPress(cmsPath)
+			} else if cmsType == "joomla" {
+				db, cfg, defaultPrefix, err2 := joomla.ProcessJoomla(cmsPath)
+				if err2 == nil {
+					fmt.Printf("Joomla DB Name: %s\n", cfg.DBName)
+					fmt.Printf("Joomla DB User: %s\n", cfg.User)
+					fmt.Printf("Identified Joomla table prefixes: %v\n", defaultPrefix)
+
+					users, err3 := joomla.ListUsers(db, defaultPrefix)
+					if err3 != nil {
+						fmt.Println(fmt.Errorf("list users for prefix %s: %w", defaultPrefix, err3))
+					}
+					fmt.Printf("\nUsers for prefix '%s':\n", defaultPrefix)
+					for _, u := range users {
+						fmt.Printf("ID:%d  Username:%s  Name:%s  Email:%s  Roles:%v\n", u.ID, u.Username, u.Name, u.Email, u.Roles)
+					}
+				}
+				err = err2
+			}
+
+			if err != nil {
+				log.Printf("Error processing %s: %v", cmsType, err)
+			}
+		},
+	}
+
+	userInfoCmd := &cobra.Command{
+		Use:   "info",
+		Short: "Show user info",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("User info functionality not implemented yet.")
+		},
+	}
+
+	editCmd := &cobra.Command{
+		Use:   "edit [USERNAME]",
+		Short: "Edit user details",
+		Args:  cobra.ExactArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			username := args[0]
+			cmsType := detectCMS()
+			if cmsType == "" {
+				log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
+			}
+
+			var err error
+			if cmsType == "wordpress" {
+				err = wordpress.EditUser(cmsPath, username)
+			} else if cmsType == "joomla" {
+				db, _, defaultPrefix, err2 := joomla.ProcessJoomla(cmsPath)
+				if err2 == nil {
+					err = joomla.EditUser(db, defaultPrefix, cmsPath, username)
+				} else {
+					err = err2
+				}
+			}
+
+			if err != nil {
+				log.Printf("Error editing %s user: %v", cmsType, err)
+			}
+		},
+	}
+
+	usersCmd.AddCommand(listCmd)
+	usersCmd.AddCommand(userInfoCmd)
+	usersCmd.AddCommand(editCmd)
+
+	infoCmd := &cobra.Command{
+		Use:   "info",
+		Short: "Show CMS information",
+	}
+
+	generalCmd := &cobra.Command{
+		Use:   "general",
+		Short: "Show general CMS information",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmsType := detectCMS()
+			if cmsType == "" {
+				log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
+			}
+
+			var err error
+			if cmsType == "wordpress" {
+				err = wordpress.ShowInfo(cmsPath)
+			} else if cmsType == "joomla" {
+				err = joomla.ShowInfo(cmsPath)
+			}
+
+			if err != nil {
+				log.Printf("Error showing %s info: %v", cmsType, err)
+			}
+		},
+	}
+
+	versionCmd := &cobra.Command{
+		Use:   "version",
+		Short: "Show CMS version information",
+		Run: func(cmd *cobra.Command, args []string) {
+			cmsType := detectCMS()
+			if cmsType == "" {
+				log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
+			}
+
+			var version, rel string
+			var err error
+			if cmsType == "wordpress" {
+				version, err = wordpress.GetVersion(cmsPath)
+			} else if cmsType == "joomla" {
+				version, rel, err = joomla.GetVersion(cmsPath)
+			}
+
+			if err != nil {
+				log.Printf("Error showing %s version: %v", cmsType, err)
+			} else {
+				fmt.Printf("%s Version: %s\n", cmsType, version)
+				if cmsType == "joomla" {
+					fmt.Printf("Release: %s\n", rel)
+				}
+			}
+		},
+	}
+
+	infoCmd.AddCommand(generalCmd)
+	infoCmd.AddCommand(versionCmd)
+
+	rootCmd.AddCommand(usersCmd)
+	rootCmd.AddCommand(infoCmd)
+
+	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
 }
@@ -56,119 +196,4 @@ func detectCMS() string {
 		return "joomla"
 	}
 	return ""
-}
-
-func listUsers(cmd *cli.Cmd) {
-	cmd.Action = func() {
-		cmsType := detectCMS()
-		if cmsType == "" {
-			log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
-		}
-
-		var err error
-		switch cmsType {
-		case "wordpress":
-			err = wordpress.ProcessWordPress(cmsPath)
-		case "joomla":
-			db, cfg, defaultPrefix, err := joomla.ProcessJoomla(cmsPath)
-			if err == nil {
-				fmt.Printf("Joomla DB Name: %s\n", cfg.DBName)
-				fmt.Printf("Joomla DB User: %s\n", cfg.User)
-				fmt.Printf("Identified Joomla table prefixes: %v\n", defaultPrefix)
-
-				users, err := joomla.ListUsers(db, defaultPrefix)
-				if err != nil {
-					fmt.Println(fmt.Errorf("list users for prefix %s: %w", defaultPrefix, err))
-				}
-				fmt.Printf("\nUsers for prefix '%s':\n", defaultPrefix)
-				for _, u := range users {
-					fmt.Printf("ID:%d  Username:%s  Name:%s  Email:%s  Roles:%v\n", u.ID, u.Username, u.Name, u.Email, u.Roles)
-				}
-			}
-		}
-
-		if err != nil {
-			log.Printf("Error processing %s: %v", cmsType, err)
-		}
-	}
-}
-
-func editUser(cmd *cli.Cmd) {
-	var username = cmd.StringArg("USERNAME", "", "Username of the user to edit")
-
-	cmd.Action = func() {
-		cmsType := detectCMS()
-		if cmsType == "" {
-			log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
-		}
-
-		var err error
-		switch cmsType {
-		case "wordpress":
-			err = wordpress.EditUser(cmsPath, *username)
-		case "joomla":
-			db, _, defaultPrefix, err := joomla.ProcessJoomla(cmsPath)
-			if err == nil {
-				err = joomla.EditUser(db, defaultPrefix, cmsPath, *username)
-			}
-		}
-
-		if err != nil {
-			log.Printf("Error editing %s user: %v", cmsType, err)
-		}
-	}
-}
-
-func showInfo(cmd *cli.Cmd) {
-	cmd.Action = func() {
-		cmsType := detectCMS()
-		if cmsType == "" {
-			log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
-		}
-
-		var err error
-		switch cmsType {
-		case "wordpress":
-			err = wordpress.ShowInfo(cmsPath)
-		case "joomla":
-			err = joomla.ShowInfo(cmsPath)
-		}
-
-		if err != nil {
-			log.Printf("Error showing %s info: %v", cmsType, err)
-		}
-	}
-}
-
-func showVersion(cmd *cli.Cmd) {
-	cmd.Action = func() {
-		cmsType := detectCMS()
-		if cmsType == "" {
-			log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
-		}
-
-		var version, rel string
-		var err error
-		switch cmsType {
-		case "wordpress":
-			version, err = wordpress.GetVersion(cmsPath)
-		case "joomla":
-			version, rel, err = joomla.GetVersion(cmsPath)
-		}
-
-		if err != nil {
-			log.Printf("Error showing %s version: %v", cmsType, err)
-		} else {
-			fmt.Printf("%s Version: %s\n", cmsType, version)
-			if cmsType == "joomla" {
-				fmt.Printf("Release: %s\n", rel)
-			}
-		}
-	}
-}
-
-func userInfo(cmd *cli.Cmd) {
-	cmd.Action = func() {
-		fmt.Println("User info functionality not implemented yet.")
-	}
 }

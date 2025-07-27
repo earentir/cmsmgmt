@@ -3,7 +3,7 @@ package wordpress
 
 import (
 	"bufio"
-	"cmsum/database"
+	"cmsmgmt/database"
 	"database/sql"
 	"fmt"
 	"net"

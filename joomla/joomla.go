@@ -2,7 +2,7 @@ package joomla
 
 import (
 	"bufio"
-	"cmsum/database"
+	"cmsmgmt/database"
 	"crypto/md5"
 	"database/sql"
 	"encoding/hex"
