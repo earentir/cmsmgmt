@@ -19,9 +19,9 @@ var (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:     "cmsum",
-		Short:   "Content Management System User Management",
-		Long:    "https://github.com/earentir/cmsum",
+		Use:     "cmsmgmt",
+		Short:   "Content Management System Management",
+		Long:    "Content Management System Management - https://github.com/earentir/cmsmgmt",
 		Version: appVersion,
 
 		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
