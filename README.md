@@ -1,71 +1,85 @@
-# cmsum
-CMS Management
-A tool to manage CMS in the current path
-Supports:
-- Wordpress
-- Joomla
+# cmsmgmt
 
+Content Management System Management (cmsmgmt) is a command-line tool written in Go for inspecting and managing local installations of WordPress and Joomla. It can detect the CMS type in a given directory, extract the database configuration from the CMS configuration file, connect to the database, list user accounts, edit user details, and show general or version information.
 
 ## Features
 
-- User Managemt
-    - List Users/Roles
-    - Edit User
-- CMS Information
-    - Detect CMS Type
-    - General Information
-    - Version Information
+- **Automatic CMS detection** – Point `cmsmgmt` at the root of your CMS installation using the `-p`/`--path` flag (or run it in the CMS directory), and it will determine whether you are working with WordPress or Joomla by looking for `wp-config.php` or `configuration.php`.
+- **Database configuration parsing** – Reads your CMS configuration to determine connection details for MySQL/PostgreSQL (Joomla) or MySQL (WordPress), including host, port, username, password and database name.
+- **List users** – Enumerates all user accounts in your CMS. For WordPress it reports the username, e-mail, role and other metadata; for Joomla it shows ID, username, name, email and roles.
+- **Edit users** – Allows you to update user information (name and e-mail) for both WordPress and Joomla. Run `cmsmgmt users edit <username>` and follow the prompts.
+- **CMS information** – Displays general information about the CMS and version number. The `info general` command prints the database name, database user and detected table prefixes. `info version` prints the WordPress or Joomla version (and release for Joomla).
+- **Cross-database support** – Joomla installations can be backed by MySQL or PostgreSQL. WordPress support currently assumes MySQL.
 
-## Usage/Examples
+## Installation
 
-### WordPress
+This project is written in Go. To build from source you need Go ≥ 1.24:
+
 ```bash
-[earentir@Athena www]$ cmsum
-
-DB Name: website_db
-DB User: website_user
-Identified WordPress table prefixes: wp
-WordPress Users for prefix 'wp':
-ID: 1, Username: administrator, Email: administrator@domain.tld, Role: Administrator, First Name: , Last Name: , Nickname:
+git clone https://github.com/earentir/cmsmgmt.git
+cd cmsmgmt
+go build -o cmsmgmt
 ```
 
+Alternatively, you can install the latest version into your `$GOBIN` using:
 
-### Joomla
 ```bash
-[earentir@Athena www]$ cmsum
-
- ~/cmsum
-DB Name: website_db
-DB User: website_user
-
-Identified Joomla table prefixes: rq5bl
-
-Identified Joomla users:
-ID: 739, Username: administrator, Roles: Super Users, Name: Super User, Email: info@domain.tld
-ID: 740, Username: admin, Roles: Super Users, Name: Admin, Email: support@domain.tld
+go install github.com/earentir/cmsmgmt@latest
 ```
 
+The resulting binary can be copied anywhere on your `PATH`.
+
+## Usage
+
+Run `cmsmgmt --help` to see top-level usage. The basic pattern is:
+
+```bash
+cmsmgmt [--path /path/to/cms] <command> [subcommand] [flags]
+```
+
+If `--path` is omitted, `cmsmgmt` assumes the current working directory is the root of your CMS installation.
+
+### List users
+
+```bash
+# From within the CMS root directory
+cmsmgmt users list
+
+# Or specify the CMS path explicitly
+cmsmgmt --path /var/www/html users list
+```
+
+### Show CMS information
+
+```bash
+# Display general information such as DB name, DB user and table prefixes
+cmsmgmt info general
+
+# Show CMS version (and release for Joomla)
+cmsmgmt info version
+```
+
+### Edit a user
+
+```bash
+# Edit the user with username "admin"
+cmsmgmt users edit admin
+```
+
+When you edit a user, `cmsmgmt` will connect to the database and update the user's name and e-mail address.
 
 ## Roadmap
 
-- Change User Password
+Future enhancements may include:
 
-- Return CMS Version
+- Changing passwords for Joomla and WordPress users.
+- Additional CMS support beyond WordPress and Joomla.
+- More detailed reporting on CMS configuration and security settings.
 
-## Dependancies & Documentation
-
-[![Go Mod](https://img.shields.io/github/go-mod/go-version/earentir/cmsum)]()
-
-[![Go Reference](https://pkg.go.dev/badge/github.com/earentir/cmsum.svg)](https://pkg.go.dev/github.com/earentir/cmsum)
-
-[![Dependancies](https://img.shields.io/librariesio/github/earentir/cmsum)]()
 ## Authors
 
 - [@earentir](https://www.github.com/earentir)
 
-
 ## License
 
-I will always follow the Linux Kernel License as primary, if you require any other OPEN license please let me know and I will try to accomodate it.
-
-[![License](https://img.shields.io/github/license/earentir/gitearelease)](https://opensource.org/license/gpl-2-0)
+This project follows the Linux Kernel licence (GPL v2). If you require another open licence, please open an issue and we will try to accommodate it.
