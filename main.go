@@ -24,7 +24,7 @@ func main() {
 		Long:    "https://github.com/earentir/cmsum",
 		Version: appVersion,
 
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(_ *cobra.Command, _ []string) error {
 			if cmsPath != "" {
 				if _, err := os.Stat(cmsPath); os.IsNotExist(err) {
 					return fmt.Errorf("The specified CMS path does not exist: %s", cmsPath)
@@ -44,16 +44,17 @@ func main() {
 	listCmd := &cobra.Command{
 		Use:   "list",
 		Short: "List users",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			cmsType := detectCMS()
 			if cmsType == "" {
 				log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
 			}
 
 			var err error
-			if cmsType == "wordpress" {
+			switch cmsType {
+			case "wordpress":
 				err = wordpress.ProcessWordPress(cmsPath)
-			} else if cmsType == "joomla" {
+			case "joomla":
 				db, cfg, defaultPrefix, err2 := joomla.ProcessJoomla(cmsPath)
 				if err2 == nil {
 					fmt.Printf("Joomla DB Name: %s\n", cfg.DBName)
@@ -62,11 +63,13 @@ func main() {
 
 					users, err3 := joomla.ListUsers(db, defaultPrefix)
 					if err3 != nil {
+						log.Printf("list users for prefix %s: %v", defaultPrefix, err3)
 						fmt.Println(fmt.Errorf("list users for prefix %s: %w", defaultPrefix, err3))
-					}
-					fmt.Printf("\nUsers for prefix '%s':\n", defaultPrefix)
-					for _, u := range users {
-						fmt.Printf("ID:%d  Username:%s  Name:%s  Email:%s  Roles:%v\n", u.ID, u.Username, u.Name, u.Email, u.Roles)
+					} else {
+						fmt.Printf("\nUsers for prefix '%s':\n", defaultPrefix)
+						for _, u := range users {
+							fmt.Printf("ID:%d  Username:%s  Name:%s  Email:%s  Roles:%v\n", u.ID, u.Username, u.Name, u.Email, u.Roles)
+						}
 					}
 				}
 				err = err2
@@ -81,7 +84,7 @@ func main() {
 	userInfoCmd := &cobra.Command{
 		Use:   "info",
 		Short: "Show user info",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			fmt.Println("User info functionality not implemented yet.")
 		},
 	}
@@ -90,7 +93,7 @@ func main() {
 		Use:   "edit [USERNAME]",
 		Short: "Edit user details",
 		Args:  cobra.ExactArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, args []string) {
 			username := args[0]
 			cmsType := detectCMS()
 			if cmsType == "" {
@@ -98,9 +101,10 @@ func main() {
 			}
 
 			var err error
-			if cmsType == "wordpress" {
+			switch cmsType {
+			case "wordpress":
 				err = wordpress.EditUser(cmsPath, username)
-			} else if cmsType == "joomla" {
+			case "joomla":
 				db, _, defaultPrefix, err2 := joomla.ProcessJoomla(cmsPath)
 				if err2 == nil {
 					err = joomla.EditUser(db, defaultPrefix, cmsPath, username)
@@ -127,16 +131,17 @@ func main() {
 	generalCmd := &cobra.Command{
 		Use:   "general",
 		Short: "Show general CMS information",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			cmsType := detectCMS()
 			if cmsType == "" {
 				log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
 			}
 
 			var err error
-			if cmsType == "wordpress" {
+			switch cmsType {
+			case "wordpress":
 				err = wordpress.ShowInfo(cmsPath)
-			} else if cmsType == "joomla" {
+			case "joomla":
 				err = joomla.ShowInfo(cmsPath)
 			}
 
@@ -149,7 +154,7 @@ func main() {
 	versionCmd := &cobra.Command{
 		Use:   "version",
 		Short: "Show CMS version information",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			cmsType := detectCMS()
 			if cmsType == "" {
 				log.Fatal("Unable to detect CMS type. Make sure you're in the correct directory or specify the correct path using the -p flag.")
@@ -157,9 +162,10 @@ func main() {
 
 			var version, rel string
 			var err error
-			if cmsType == "wordpress" {
+			switch cmsType {
+			case "wordpress":
 				version, err = wordpress.GetVersion(cmsPath)
-			} else if cmsType == "joomla" {
+			case "joomla":
 				version, rel, err = joomla.GetVersion(cmsPath)
 			}
 
